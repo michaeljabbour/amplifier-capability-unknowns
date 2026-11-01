@@ -2,11 +2,11 @@
 
 Find the question that could change your plan.
 
-Watch the [67-second film](https://michaeljabbour.github.io/amplifier-skill-unknowns/#film): a twelve-step plan, one unchecked assumption, and the small test that finds it before anything moves. The example in it is fictional.
+Watch the [67-second film](https://michaeljabbour.github.io/amplifier-capability-unknowns/#film): a twelve-step plan, one unchecked assumption, and the small test that finds it before anything moves. The example in it is fictional.
 
 For people starting unfamiliar or uncertain work. Unknowns makes assumptions and unanswered questions visible, attaches an evidence basis and helps choose the next useful inquiry instead of growing an endless risk list.
 
-[Explore the site](https://michaeljabbour.github.io/amplifier-skill-unknowns/)
+[Explore the site](https://michaeljabbour.github.io/amplifier-capability-unknowns/)
 
 ## What you get
 
@@ -17,8 +17,8 @@ For people starting unfamiliar or uncertain work. Unknowns makes assumptions and
 ## Start here
 
 ```sh
-git clone https://github.com/michaeljabbour/amplifier-skill-unknowns.git
-cd amplifier-skill-unknowns
+git clone https://github.com/michaeljabbour/amplifier-capability-unknowns.git
+cd amplifier-capability-unknowns
 python3 scripts/capability.py install --dest ~/.agents/skills
 ```
 
@@ -90,7 +90,7 @@ and its interactive orchestration. Configure that host and its provider before
 using this optional path. Install the root bundle:
 
 ```
-amplifier bundle add https://github.com/michaeljabbour/amplifier-skill-unknowns
+amplifier bundle add https://github.com/michaeljabbour/amplifier-capability-unknowns
 ```
 
 Then pick either of the two easiest first runs.
