@@ -42,6 +42,7 @@ _SEVERITY_ORDER = {"high": 0, "med": 1, "low": 2, None: 3}
 _DOT_KEYWORDS = {"graph", "node", "edge", "subgraph", "digraph"}
 
 _LABEL_RE = re.compile(r'label="((?:\\.|[^"\\])*)"')
+_LABEL_META_RE = re.compile(r"\\n\[([^\[\]]*)\]$")
 _NODE_ID_RE = re.compile(r"^\s*([A-Za-z_]\w*)\s*\[")
 _UNSUPPORTED_DESC_RE = re.compile(
     r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\u2028\u2029\ud800-\udfff]"
@@ -64,9 +65,11 @@ class Unknown:
 def _parse_label_attrs(label: str) -> tuple[str, str | None, str | None, str | None]:
     # Only the final metadata separator is structural; earlier escaped line
     # breaks (or literal backslash-n text) belong to the description.
-    desc, separator, attrs = label.rpartition("\\n[")
-    if not separator:
-        desc, attrs = label, label  # tolerate legacy labels without a separator
+    metadata = _LABEL_META_RE.search(label)
+    if metadata:
+        desc, attrs = label[:metadata.start()], metadata.group(1)
+    else:
+        desc, attrs = label, ""
     desc = re.sub(r'\\([\\"nr])', lambda m: _DESC_ESCAPES[m.group(1)], desc)
     q = re.search(r"quadrant=(\w+)", attrs)
     s = re.search(r"status=(\w+)", attrs)
@@ -93,7 +96,7 @@ def parse_map(map_path: Path | str = DEFAULT_MAP) -> list[Unknown]:
         if not m or m.group(1) in _DOT_KEYWORDS:
             continue
         lm = _LABEL_RE.search(line)
-        if not lm or "quadrant=" not in lm.group(1):
+        if not lm or not _LABEL_META_RE.search(lm.group(1)):
             continue
         desc, quadrant, status, severity = _parse_label_attrs(lm.group(1))
         nodes.append(Unknown(m.group(1), desc, quadrant, status, severity, i))
@@ -242,15 +245,23 @@ def reclassify(
         raise KeyError(f"node {node_id!r} not found in {path}")
     node = nodes[node_id]
     line = lines[node.line_no]
+    label = _LABEL_RE.search(line)
+    metadata = _LABEL_META_RE.search(label.group(1)) if label else None
+    if not metadata:
+        raise ValueError(f"canonical metadata not found for node {node_id!r}")
+    attrs = metadata.group(1)
     if quadrant:
-        line = re.sub(r"quadrant=\w+", f"quadrant={quadrant}", line)
+        attrs = re.sub(r"quadrant=\w+", f"quadrant={quadrant}", attrs)
     if status:
-        line = re.sub(r"status=\w+", f"status={status}", line)
+        attrs = re.sub(r"status=\w+", f"status={status}", attrs)
     if severity:
-        if "severity=" in line:
-            line = re.sub(r"severity=\w+", f"severity={severity}", line)
+        if "severity=" in attrs:
+            attrs = re.sub(r"severity=\w+", f"severity={severity}", attrs)
         else:
-            line = line.replace(']"', f', severity={severity}]"', 1)
+            attrs += f", severity={severity}"
+    start = label.start(1) + metadata.start(1)
+    end = label.start(1) + metadata.end(1)
+    line = line[:start] + attrs + line[end:]
     if technique:
         line = line.rstrip()
         line += f"  // reclassified via {technique}"

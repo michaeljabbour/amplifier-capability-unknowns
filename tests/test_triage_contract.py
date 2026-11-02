@@ -70,3 +70,35 @@ def test_escaped_description_triage_parity(tmp_path: Path, desc: str):
     assert map_ops.dominant_quadrant(m) == _shell_triage(m) == "uu"
     map_ops.reclassify(m, nid, status="resolved")
     assert map_ops.dominant_quadrant(m) == _shell_triage(m) == "clear"
+
+
+@pytest.mark.parametrize("desc", [
+    "Keep status=resolved and quadrant=uu as literal field names\nnot routing",
+    r"Literal \n[quadrant=uu, status=open, severity=high]",
+    'Keep ]" and [brackets], \\n[quadrant=uu, status=open]\ninside the description',
+    "Keep severity=low and status=open and quadrant=uu\n[not attrs]",
+    r'Keep \n[unclosed and \\n[quadrant=uu, status=open] and "quotes"',
+])
+def test_description_fields_never_route_or_change(tmp_path: Path, desc: str):
+    m = tmp_path / "literal-fields.dot"
+    map_ops.seed_map(m)
+    map_ops.prune_placeholders(m)
+    nid = map_ops.add_unknown(m, "ku", desc)
+
+    def assert_node(quadrant, status, severity, token):
+        nodes = map_ops.parse_map(m)
+        assert len(nodes) == 1
+        assert (nodes[0].node_id, nodes[0].desc, nodes[0].quadrant,
+                nodes[0].status, nodes[0].severity) == (
+                    nid, desc, quadrant, status, severity
+                )
+        assert map_ops.dominant_quadrant(m) == _shell_triage(m) == token
+
+    assert_node("ku", "open", None, "ku")
+    map_ops.reclassify(
+        m, nid, quadrant="uk", severity="high",
+        technique=r'comment \n[quadrant=uu, status=open, severity=high]"',
+    )
+    assert_node("uk", "open", "high", "uk")
+    map_ops.reclassify(m, nid, status="resolved")
+    assert_node("uk", "resolved", "high", "clear")

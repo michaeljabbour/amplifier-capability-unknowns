@@ -30,9 +30,11 @@ if [ ! -f "$MAP_FILE" ]; then
     exit 0
 fi
 
-# Line-oriented count (not a real DOT parser): the node schema in
-# unknowns-matrix.md keeps quadrant= and status= (and severity=, when
-# present) on the same physical label line, which is sufficient here.
+# Extract only the final \n[metadata] segment of canonical node labels.
+# Descriptions may contain escaped quotes, line breaks and literal field
+# names; none of that free text participates in routing. This remains a
+# line-oriented reader of the node schema, not a general DOT parser.
+NODE_ATTRS=$(sed -nE 's/^[[:space:]]*[[:alpha:]_][[:alnum:]_]*[[:space:]]*\[[[:space:]]*label="(\\.|[^"\\])*\\n\[([^][]*)\]".*$/\2/p' "$MAP_FILE")
 #
 # Each grep may legitimately match zero lines (a quadrant can be empty).
 # Under `set -o pipefail`, grep's own non-zero "no match" exit status would
@@ -40,10 +42,10 @@ fi
 # `wc -l` output (0) is exactly the answer we want -- so `|| true` guards
 # each assignment without masking real errors (a missing/unreadable file is
 # already handled above, before these greps run).
-UU_OPEN=$(grep -E "quadrant=uu[^]]*status=open" "$MAP_FILE" 2>/dev/null | wc -l | tr -d ' ') || true
-UK_OPEN=$(grep -E "quadrant=uk[^]]*status=open" "$MAP_FILE" 2>/dev/null | wc -l | tr -d ' ') || true
-KU_OPEN=$(grep -E "quadrant=ku[^]]*status=open" "$MAP_FILE" 2>/dev/null | wc -l | tr -d ' ') || true
-UU_HIGH=$(grep -E "quadrant=uu[^]]*status=open[^]]*severity=high" "$MAP_FILE" 2>/dev/null | wc -l | tr -d ' ') || true
+UU_OPEN=$(printf '%s\n' "$NODE_ATTRS" | grep -E "quadrant=uu[^]]*status=open" | wc -l | tr -d ' ') || true
+UK_OPEN=$(printf '%s\n' "$NODE_ATTRS" | grep -E "quadrant=uk[^]]*status=open" | wc -l | tr -d ' ') || true
+KU_OPEN=$(printf '%s\n' "$NODE_ATTRS" | grep -E "quadrant=ku[^]]*status=open" | wc -l | tr -d ' ') || true
+UU_HIGH=$(printf '%s\n' "$NODE_ATTRS" | grep -E "quadrant=uu[^]]*status=open[^]]*severity=high" | wc -l | tr -d ' ') || true
 
 # Precedence, first match wins:
 if [ "$UU_HIGH" -gt 0 ]; then

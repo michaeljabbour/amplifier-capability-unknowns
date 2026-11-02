@@ -129,6 +129,17 @@ def test_reclassify_unknown_node_raises(seeded: Path):
         map_ops.reclassify(seeded, "nope_1", status="resolved")
 
 
+def test_reclassify_without_final_metadata_does_not_mutate(tmp_path: Path):
+    m = tmp_path / "legacy.dot"
+    m.write_text('digraph G {\n  ku_1 [label="literal quadrant=ku, status=open"]\n}\n')
+    before = m.read_bytes()
+    assert map_ops.parse_map(m) == []
+    assert map_ops.dominant_quadrant(m) == "clear"
+    with pytest.raises(KeyError, match="not found"):
+        map_ops.reclassify(m, "ku_1", status="resolved")
+    assert m.read_bytes() == before
+
+
 def test_prune_placeholders(seeded: Path):
     removed = map_ops.prune_placeholders(seeded)
     assert removed >= 4  # 4 placeholder nodes + 2 example edges
