@@ -52,3 +52,21 @@ def test_python_matches_shell(tmp_path: Path, name: str, adds):
 def test_missing_map_parity(tmp_path: Path):
     missing = tmp_path / "nope.dot"
     assert map_ops.dominant_quadrant(missing) == _shell_triage(missing) == "clear"
+
+
+@pytest.mark.parametrize("desc", [
+    "Can export preserve\nall Unicode?",
+    "first\rsecond",
+    "first\r\nsecond",
+    'Keep "quotes", C:\\new\\reports\\, literal \\n, and café 中文 🧭',
+])
+def test_escaped_description_triage_parity(tmp_path: Path, desc: str):
+    m = tmp_path / "escaped.dot"
+    map_ops.seed_map(m)
+    map_ops.prune_placeholders(m)
+    nid = map_ops.add_unknown(m, "ku", desc)
+    assert map_ops.dominant_quadrant(m) == _shell_triage(m) == "ku"
+    map_ops.reclassify(m, nid, quadrant="uu", severity="high")
+    assert map_ops.dominant_quadrant(m) == _shell_triage(m) == "uu"
+    map_ops.reclassify(m, nid, status="resolved")
+    assert map_ops.dominant_quadrant(m) == _shell_triage(m) == "clear"

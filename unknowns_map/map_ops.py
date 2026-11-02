@@ -41,8 +41,12 @@ QUADRANT_TITLES = {
 _SEVERITY_ORDER = {"high": 0, "med": 1, "low": 2, None: 3}
 _DOT_KEYWORDS = {"graph", "node", "edge", "subgraph", "digraph"}
 
-_LABEL_RE = re.compile(r'label="([^"]*)"')
+_LABEL_RE = re.compile(r'label="((?:\\.|[^"\\])*)"')
 _NODE_ID_RE = re.compile(r"^\s*([A-Za-z_]\w*)\s*\[")
+_UNSUPPORTED_DESC_RE = re.compile(
+    r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\u2028\u2029\ud800-\udfff]"
+)
+_DESC_ESCAPES = {"\\": "\\", '"': '"', "n": "\n", "r": "\r"}
 
 
 @dataclass
@@ -58,10 +62,15 @@ class Unknown:
 
 
 def _parse_label_attrs(label: str) -> tuple[str, str | None, str | None, str | None]:
-    desc = label.split("\\n")[0].strip()
-    q = re.search(r"quadrant=(\w+)", label)
-    s = re.search(r"status=(\w+)", label)
-    sev = re.search(r"severity=(\w+)", label)
+    # Only the final metadata separator is structural; earlier escaped line
+    # breaks (or literal backslash-n text) belong to the description.
+    desc, separator, attrs = label.rpartition("\\n[")
+    if not separator:
+        desc, attrs = label, label  # tolerate legacy labels without a separator
+    desc = re.sub(r'\\([\\"nr])', lambda m: _DESC_ESCAPES[m.group(1)], desc)
+    q = re.search(r"quadrant=(\w+)", attrs)
+    s = re.search(r"status=(\w+)", attrs)
+    sev = re.search(r"severity=(\w+)", attrs)
     return (
         desc,
         q.group(1) if q else None,
@@ -176,7 +185,15 @@ def _node_line(
     attrs = f"quadrant={quadrant}, status={status}"
     if severity:
         attrs += f", severity={severity}"
-    desc = desc.replace('"', "'")
+    # Keep the canonical label on one physical line for both parsers. Reject
+    # other controls/line separators and invalid Unicode before any file write.
+    unsupported = _UNSUPPORTED_DESC_RE.search(desc)
+    if unsupported:
+        raise ValueError(
+            f"unsupported description character U+{ord(unsupported.group()):04X}"
+        )
+    desc = (desc.replace("\\", "\\\\").replace('"', '\\"')
+            .replace("\n", "\\n").replace("\r", "\\r"))
     extra = ""
     if quadrant == "uu":
         extra = ', fillcolor="#3A3A36", fontcolor="#DDD8CC", color="#777770"'

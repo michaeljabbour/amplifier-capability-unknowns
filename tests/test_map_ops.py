@@ -38,6 +38,55 @@ def test_add_and_counts(seeded: Path):
     assert c["uu"]["open"] == 1
 
 
+@pytest.mark.parametrize(
+    "desc",
+    [
+        "Can export preserve\nall Unicode?",
+        "first\rsecond",
+        "first\r\nsecond",
+        'Keep "quoted text" and C:\\new\\reports\\',
+        r"Keep literal \n and \r escapes",
+        "Unicode: café Ελληνικά 中文 🧭 e\u0301",
+        "  preserve leading and trailing whitespace\t ",
+    ],
+    ids=["lf", "cr", "crlf", "quotes-backslashes", "literal-escapes", "unicode", "whitespace"],
+)
+def test_description_roundtrip_and_reclassify(seeded: Path, desc: str):
+    map_ops.prune_placeholders(seeded)
+    node_id = map_ops.add_unknown(seeded, "ku", desc, severity="med")
+    nodes = map_ops.parse_map(seeded)
+    assert len(nodes) == 1
+    assert (nodes[0].node_id, nodes[0].desc, nodes[0].quadrant, nodes[0].status) == (
+        node_id, desc, "ku", "open"
+    )
+    assert map_ops.dominant_quadrant(seeded) == "ku"
+    assert len([line for line in seeded.read_text().splitlines() if f"{node_id} [" in line]) == 1
+
+    # The description survives an in-place update and a physical cluster move.
+    map_ops.reclassify(seeded, node_id, severity="high")
+    map_ops.reclassify(seeded, node_id, quadrant="uu", status="resolved")
+    nodes = map_ops.parse_map(seeded)
+    assert len(nodes) == 1
+    assert (nodes[0].node_id, nodes[0].desc, nodes[0].quadrant,
+            nodes[0].status, nodes[0].severity) == (node_id, desc, "uu", "resolved", "high")
+    assert map_ops.dominant_quadrant(seeded) == "clear"
+
+
+@pytest.mark.parametrize("char", ["\x00", "\v", "\f", "\x1c", "\x85", "\u2028", "\u2029", "\ud800"])
+def test_unsupported_description_characters_do_not_mutate(seeded: Path, char: str):
+    before = seeded.read_bytes()
+    with pytest.raises(ValueError, match="unsupported description character"):
+        map_ops.add_unknown(seeded, "ku", f"before{char}after")
+    assert seeded.read_bytes() == before
+
+
+def test_add_to_missing_map_does_not_create_file(tmp_path: Path):
+    missing = tmp_path / "missing.dot"
+    with pytest.raises(FileNotFoundError):
+        map_ops.add_unknown(missing, "ku", "first\nsecond")
+    assert not missing.exists()
+
+
 def test_triage_precedence(tmp_path: Path):
     m = tmp_path / "map.dot"
     map_ops.seed_map(m, task="t")
