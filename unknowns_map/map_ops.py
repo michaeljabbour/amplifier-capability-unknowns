@@ -90,8 +90,8 @@ def parse_map(map_path: Path | str = DEFAULT_MAP) -> list[Unknown]:
         return []
     nodes: list[Unknown] = []
     for i, line in enumerate(path.read_text().splitlines()):
-        if "->" in line:
-            continue  # edge line
+        # Node syntax starts with 'id ['; a real edge does not. Arrows in a
+        # quoted description or trailing comment remain ordinary node data.
         m = _NODE_ID_RE.match(line)
         if not m or m.group(1) in _DOT_KEYWORDS:
             continue

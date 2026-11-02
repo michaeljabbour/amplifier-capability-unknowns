@@ -102,3 +102,57 @@ def test_description_fields_never_route_or_change(tmp_path: Path, desc: str):
     assert_node("uk", "open", "high", "uk")
     map_ops.reclassify(m, nid, status="resolved")
     assert_node("uk", "resolved", "high", "clear")
+
+
+@pytest.mark.parametrize("desc,technique", [
+    ("Can CSV -> JSON preserve Unicode?", ""),
+    ("Can CSV preserve Unicode?", "CSV -> JSON review"),
+    (
+        'Keep "CSV -> JSON", café, C:\\new\\, and literal \\n[quadrant=uu, status=open]',
+        r'CSV -> JSON "review" \n[quadrant=uu, status=open, severity=high]"',
+    ),
+], ids=["description-arrow", "comment-arrow", "escaped-fields-arrow"])
+def test_arrow_text_is_node_data(tmp_path: Path, desc: str, technique: str):
+    m = tmp_path / "arrows.dot"
+    map_ops.seed_map(m)
+    map_ops.prune_placeholders(m)
+    nid = map_ops.add_unknown(m, "ku", desc)
+
+    def assert_node(quadrant, status, severity, token):
+        nodes = map_ops.parse_map(m)
+        assert len(nodes) == 1
+        assert (nodes[0].node_id, nodes[0].desc, nodes[0].quadrant,
+                nodes[0].status, nodes[0].severity) == (
+                    nid, desc, quadrant, status, severity
+                )
+        assert map_ops.dominant_quadrant(m) == _shell_triage(m) == token
+
+    assert_node("ku", "open", None, "ku")
+    map_ops.reclassify(m, nid, severity="high", technique=technique)
+    assert_node("ku", "open", "high", "ku")
+    map_ops.reclassify(m, nid, quadrant="uk", status="resolved")
+    assert_node("uk", "resolved", "high", "clear")
+    next_id = map_ops.add_unknown(m, "ku", "next question")
+    assert next_id == "ku_2"  # the first node still reserves its original id
+    assert {n.node_id for n in map_ops.parse_map(m)} == {nid, next_id}
+    assert map_ops.dominant_quadrant(m) == _shell_triage(m) == "ku"
+
+
+def test_real_arrows_and_comment_declarations_are_not_nodes(tmp_path: Path):
+    m = tmp_path / "real-edges.dot"
+    map_ops.seed_map(m)
+    map_ops.prune_placeholders(m)
+    first = map_ops.add_unknown(m, "kk", "source", status="given")
+    second = map_ops.add_unknown(m, "ku", "destination")
+    lines = m.read_text().splitlines()
+    lines[-1:-1] = [
+        f'  {first} -> {second} [label="edge -> text\\n[quadrant=uu, status=open, severity=high]"]',
+        f'  {second}->{first} [label="reverse edge"]',
+        f'  {first}:e -> {second}:w [label="port edge"]',
+        '  // fake_1 [label="comment -> text\\n[quadrant=uu, status=open, severity=high]"]',
+    ]
+    m.write_text("\n".join(lines) + "\n")
+    assert [(n.node_id, n.desc) for n in map_ops.parse_map(m)] == [
+        (first, "source"), (second, "destination")
+    ]
+    assert map_ops.dominant_quadrant(m) == _shell_triage(m) == "ku"
