@@ -74,7 +74,7 @@ Note: `.gitignore` excludes `*.png` but explicitly re-includes `bundle.png`.
 - **`tool-skills` has NO @mention resolution** — a `config.skills:` entry like
   `"@unknowns:skills"` is *silently ignored* (skills sit on disk, never
   materialize, no error anywhere). Use the git self-reference form:
-  `git+https://github.com/michaeljabbour/amplifier-bundle-unknowns@main#subdirectory=skills`.
+  `git+https://github.com/michaeljabbour/amplifier-capability-unknowns@main#subdirectory=skills`.
   Note the asymmetry: `hooks-mode`'s `search_paths` DOES resolve @mentions —
   the two modules use different code paths. Live-confirmed in a DTU run
   (2026-07-08); a static conformance audit had passed the @mention form.

@@ -42,7 +42,7 @@ meta:
 # pattern as the behavior's skills wiring -- resolves from @main once pushed.
 tools:
   - module: tool-unknowns
-    source: git+https://github.com/michaeljabbour/amplifier-bundle-unknowns@main#subdirectory=modules/tool-unknowns
+    source: git+https://github.com/michaeljabbour/amplifier-capability-unknowns@main#subdirectory=modules/tool-unknowns
 ---
 
 # Unknowns Cartographer
